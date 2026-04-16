@@ -1,0 +1,43 @@
+# Production override for hackathon.roque.dev deployment.
+# Use:  docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+#
+# Binds all host ports to 127.0.0.1 only (host nginx is the public entrypoint).
+# Sets n8n + frontend env so URLs match the public hackathon.roque.dev domain.
+
+services:
+  postgres:
+    ports: []
+
+  backend:
+    ports:
+      - "127.0.0.1:8000:8000"
+
+  n8n:
+    ports:
+      - "127.0.0.1:5678:5678"
+    environment:
+      N8N_BASIC_AUTH_ACTIVE: "true"
+      N8N_BASIC_AUTH_USER: ${N8N_BASIC_AUTH_USER:-admin}
+      N8N_BASIC_AUTH_PASSWORD: ${N8N_BASIC_AUTH_PASSWORD}
+      N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY}
+      N8N_HOST: hackathon.roque.dev
+      N8N_PORT: "5678"
+      N8N_PROTOCOL: https
+      WEBHOOK_URL: https://hackathon.roque.dev/
+      GENERIC_TIMEZONE: Europe/Amsterdam
+      DB_TYPE: postgresdb
+      DB_POSTGRESDB_HOST: postgres
+      DB_POSTGRESDB_PORT: "5432"
+      DB_POSTGRESDB_DATABASE: wmo
+      DB_POSTGRESDB_USER: wmo
+      DB_POSTGRESDB_PASSWORD: wmo_local_dev
+      N8N_RUNNERS_ENABLED: "true"
+      N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS: "false"
+      N8N_PROXY_HOPS: "1"
+
+  frontend:
+    ports:
+      - "127.0.0.1:5173:5173"
+    environment:
+      VITE_API_BASE_URL: /api
+      VITE_N8N_WEBHOOK_URL: /webhook/wmo-intake
