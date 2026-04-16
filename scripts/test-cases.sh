@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
 # WMO Zorgagent — Testcases
-# Voert 4 curl-aanroepen uit tegen de backend en toont de resultaten.
+# Voert 4 curl-aanroepen uit tegen de n8n-webhook en toont de resultaten.
 # Gebruik: bash scripts/test-cases.sh
 # Vereist: curl (altijd aanwezig), jq (optioneel, voor pretty-print)
 
 set -euo pipefail
 
-BASE_URL="http://localhost:8000"
+WEBHOOK_URL="http://localhost:5678/webhook/wmo-intake"
+AUDIT_URL="http://localhost:8000/audit"
 
 # Pretty-print helper: gebruik jq als beschikbaar, anders cat
 pretty() {
@@ -24,7 +25,7 @@ echo ""
 
 # --- Testcase 1: Laag risico ---
 echo "--- Testcase 1: Laag risico (rolstoel, automatische route verwacht) ---"
-curl -s -X POST "${BASE_URL}/applications" \
+curl -s -X POST "${WEBHOOK_URL}" \
   -H "Content-Type: application/json" \
   -d '{
     "citizenId": "NL-BSN-001122334",
@@ -44,7 +45,7 @@ echo ""
 
 # --- Testcase 2: Hoog risico ---
 echo "--- Testcase 2: Hoog risico (huishoudelijke hulp, review verwacht) ---"
-curl -s -X POST "${BASE_URL}/applications" \
+curl -s -X POST "${WEBHOOK_URL}" \
   -H "Content-Type: application/json" \
   -d '{
     "citizenId": "NL-BSN-556677889",
@@ -64,7 +65,7 @@ echo ""
 
 # --- Testcase 3: Fairness flag ---
 echo "--- Testcase 3: Fairness flag (woningaanpassing, verboden term verwacht) ---"
-curl -s -X POST "${BASE_URL}/applications" \
+curl -s -X POST "${WEBHOOK_URL}" \
   -H "Content-Type: application/json" \
   -d '{
     "citizenId": "NL-BSN-998877665",
@@ -83,8 +84,8 @@ curl -s -X POST "${BASE_URL}/applications" \
 echo ""
 
 # --- Testcase 4: Geen toestemming ---
-echo "--- Testcase 4: Geen toestemming (consentForAI=false, HTTP 400 verwacht) ---"
-curl -s -w "\nHTTP_STATUS: %{http_code}\n" -X POST "${BASE_URL}/applications" \
+echo "--- Testcase 4: Geen toestemming (consentForAI=false, foutmelding verwacht) ---"
+curl -s -w "\nHTTP_STATUS: %{http_code}\n" -X POST "${WEBHOOK_URL}" \
   -H "Content-Type: application/json" \
   -d '{
     "citizenId": "NL-BSN-111222333",
@@ -106,4 +107,4 @@ echo "========================================"
 echo "  Alle testcases voltooid."
 echo "========================================"
 echo ""
-echo "Controleer audit logs: curl ${BASE_URL}/audit | jq"
+echo "Controleer audit logs: curl ${AUDIT_URL} | jq"
