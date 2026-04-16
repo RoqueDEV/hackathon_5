@@ -3,7 +3,7 @@ services:
     image: pgvector/pgvector:pg16
     container_name: wmo-postgres
     ports:
-      - "5433:5432"
+      - "127.0.0.1:5433:5432"
     environment:
       POSTGRES_DB: wmo
       POSTGRES_USER: wmo
@@ -22,7 +22,7 @@ services:
       context: ./backend
     container_name: wmo-backend
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     env_file:
       - .env
     environment:
@@ -75,7 +75,7 @@ services:
     image: n8nio/n8n:latest
     container_name: wmo-n8n
     ports:
-      - "5678:5678"
+      - "127.0.0.1:5678:5678"
     environment:
       N8N_BASIC_AUTH_ACTIVE: "true"
       N8N_BASIC_AUTH_USER: ${N8N_BASIC_AUTH_USER:-admin}
@@ -107,7 +107,7 @@ services:
       context: ./frontend
     container_name: wmo-frontend
     ports:
-      - "5173:5173"
+      - "127.0.0.1:5173:5173"
     environment:
       VITE_API_BASE_URL: http://localhost:8000
       VITE_N8N_WEBHOOK_URL: http://localhost:5678/webhook/wmo-intake
