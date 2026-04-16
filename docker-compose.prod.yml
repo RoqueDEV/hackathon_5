@@ -12,7 +12,12 @@ services:
     ports:
       - "127.0.0.1:8000:8000"
 
+  # Pin n8n to a version compatible with Docker 20.10.x on this host.
+  n8n-import:
+    image: n8nio/n8n:1.82.1
+
   n8n:
+    image: n8nio/n8n:1.82.1
     ports:
       - "127.0.0.1:5678:5678"
     environment:
