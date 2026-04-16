@@ -68,7 +68,7 @@ const presets: Record<string, FormState> = {
     address: 'Keizersgracht 45, Utrecht',
     citizenId: 'TC002',
     provisionType: 'rolstoel',
-    problemSummary: 'Ik kan niet meer zelfstandig lopen na mijn operatie en heb meerdere aandoeningen.',
+    problemSummary: 'Ik kan niet meer alleen lopen, val regelmatig en heb ook hartklachten. Ik heb hulp nodig bij verplaatsen binnenshuis en buitenshuis.',
     severity: 'hoog',
     mobilityIssues: true,
     multipleProblems: true,
@@ -81,7 +81,7 @@ const presets: Record<string, FormState> = {
     address: 'Nieuwstraat 12, Rotterdam',
     citizenId: 'TC003',
     provisionType: 'woningaanpassing',
-    problemSummary: 'Door mijn religie en culturele achtergrond heb ik specifieke aanpassingen nodig in de badkamer.',
+    problemSummary: 'Mijn buurman discrimineert mij vanwege mijn nationaliteit en ik durf niet meer naar buiten. Ik heb aanpassingen nodig zodat ik de woning veiliger kan verlaten.',
     severity: 'midden',
     mobilityIssues: true,
     multipleProblems: false,
@@ -104,10 +104,10 @@ const presets: Record<string, FormState> = {
 }
 
 const presetLabels = [
-  { key: 'tc1', label: 'Testcase 1', description: 'Laag risico' },
-  { key: 'tc2', label: 'Testcase 2', description: 'Hoog risico' },
-  { key: 'tc3', label: 'Testcase 3', description: 'Fairness-signaal' },
-  { key: 'tc4', label: 'Testcase 4', description: 'Geen toestemming' },
+  { key: 'tc1', label: 'TC1', description: 'Laag risico → auto burgerbericht' },
+  { key: 'tc2', label: 'TC2', description: 'Hoog risico → menselijke beoordeling' },
+  { key: 'tc3', label: 'TC3', description: 'Fairness-vlag → review' },
+  { key: 'tc4', label: 'TC4', description: 'Geen toestemming → foutmelding' },
 ]
 
 // ─── provision options ───────────────────────────────────────────────────────
