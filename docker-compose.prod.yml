@@ -19,7 +19,8 @@ services:
       N8N_HOST: hackathon.roque.dev
       N8N_PORT: "5678"
       N8N_PROTOCOL: https
-      WEBHOOK_URL: https://hackathon.roque.dev/
+      N8N_PATH: /n8n/
+      WEBHOOK_URL: https://hackathon.roque.dev/n8n/
       GENERIC_TIMEZONE: Europe/Amsterdam
       DB_TYPE: postgresdb
       DB_POSTGRESDB_HOST: postgres
@@ -34,4 +35,4 @@ services:
   frontend:
     environment:
       VITE_API_BASE_URL: /api
-      VITE_N8N_WEBHOOK_URL: /webhook/wmo-intake
+      VITE_N8N_WEBHOOK_URL: /n8n/webhook/wmo-intake
