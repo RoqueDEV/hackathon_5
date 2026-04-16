@@ -7,10 +7,10 @@
 services:
   # Pin n8n to a version compatible with Docker 20.10.x on this host.
   n8n-import:
-    image: n8nio/n8n:1.82.1
+    image: n8nio/n8n:1.88.0
 
   n8n:
-    image: n8nio/n8n:1.82.1
+    image: n8nio/n8n:1.88.0
     environment:
       N8N_BASIC_AUTH_ACTIVE: "true"
       N8N_BASIC_AUTH_USER: ${N8N_BASIC_AUTH_USER:-admin}
