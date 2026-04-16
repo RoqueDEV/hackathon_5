@@ -58,5 +58,5 @@ n8n_data/
 playwright-report/
 test-results/
 
-# Claude Code local config
-.claude/settings.local.json
+# Claude Code local config (incl. tokens, MCP, prompts)
+.claude/
