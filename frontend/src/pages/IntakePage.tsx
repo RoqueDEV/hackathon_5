@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { apiClient } from '@/lib/api'
 import type { ApplicationIn, ApplicationResult, ProvisionType, Severity } from '@/lib/types'
-import { CheckCircle2, Info, Home, Sparkles, Wrench, AlertCircle } from 'lucide-react'
+import { CheckCircle2, Info, Home, Sparkles, Wrench, AlertCircle, XCircle } from 'lucide-react'
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -217,15 +217,49 @@ export function IntakePage() {
     }
   }
 
-  // ── success / consent-rejected screen ──────────────────────────────────────
-  if (result || consentRejected) {
-    const routeText = consentRejected
-      ? 'Uw aanvraag kon niet worden verwerkt omdat u geen toestemming heeft gegeven voor AI-ondersteuning. U kunt op een later moment opnieuw een aanvraag indienen.'
-      : result?.route === 'auto'
-        ? 'Uw aanvraag wordt automatisch verwerkt. U ontvangt binnen 5 werkdagen een officieel besluit per post of e-mail van de gemeente.'
-        : result?.route === 'review'
-          ? 'Een medewerker van de gemeente kijkt nog persoonlijk naar uw aanvraag. Dit duurt doorgaans 5 tot 10 werkdagen. U hoort zo snel mogelijk meer van ons.'
-          : 'Uw aanvraag kon niet worden verwerkt omdat u geen toestemming heeft gegeven voor AI-ondersteuning. U kunt op een later moment opnieuw een aanvraag indienen.'
+  // ── consent rejected screen (TC4) ─────────────────────────────────────────
+  if (consentRejected) {
+    return (
+      <div className="flex flex-col h-full">
+        <PageHeader
+          title="Hulp aanvragen"
+          description="Vraag ondersteuning aan bij uw gemeente"
+        />
+        <div className="flex-1 overflow-auto p-6">
+          <div className="max-w-2xl mx-auto space-y-6">
+            <div className="flex flex-col items-center text-center py-6 space-y-3">
+              <XCircle size={48} className="text-[--destructive]" />
+              <h2 className="text-xl font-semibold text-[--text]">Aanvraag niet verwerkt</h2>
+              <p className="text-sm text-[--text-muted]">
+                Uw aanvraag is ontvangen maar kan niet worden verwerkt.
+              </p>
+            </div>
+
+            <div className="rounded border border-[--destructive]/30 bg-[--destructive-subtle] p-5 space-y-2">
+              <p className="text-sm font-medium text-[--destructive]">Reden: geen toestemming voor AI-ondersteuning</p>
+              <p className="text-sm text-[--text-secondary] leading-relaxed">
+                U heeft aangegeven geen toestemming te geven voor het gebruik van AI bij de beoordeling van uw aanvraag.
+                Zonder deze toestemming kunnen wij uw aanvraag op dit moment niet in behandeling nemen.
+                U kunt op een later moment opnieuw een aanvraag indienen.
+              </p>
+            </div>
+
+            <Button variant="secondary" className="w-full" onClick={resetForm}>
+              Opnieuw proberen
+            </Button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // ── success screen ──────────────────────────────────────────────────────────
+  if (result) {
+    const routeText = result.route === 'auto'
+      ? 'Uw aanvraag wordt automatisch verwerkt. U ontvangt binnen 5 werkdagen een officieel besluit per post of e-mail van de gemeente.'
+      : result.route === 'review'
+        ? 'Een medewerker van de gemeente kijkt nog persoonlijk naar uw aanvraag. Dit duurt doorgaans 5 tot 10 werkdagen. U hoort zo snel mogelijk meer van ons.'
+        : 'Uw aanvraag is in behandeling genomen.'
 
     return (
       <div className="flex flex-col h-full">
@@ -245,17 +279,15 @@ export function IntakePage() {
             </div>
 
             {/* Reference number */}
-            {result && (
-              <div className="rounded border border-[--border] bg-[--surface] p-5 text-center space-y-2">
-                <p className="text-xs text-[--text-muted] uppercase tracking-wide">Uw referentienummer</p>
-                <p className="text-2xl font-mono font-bold text-[--text]">
-                  {formatReference(result.applicationId)}
-                </p>
-                <p className="text-xs text-[--text-muted]">
-                  Bewaar dit nummer. U kunt hiermee uw aanvraag later terugvinden.
-                </p>
-              </div>
-            )}
+            <div className="rounded border border-[--border] bg-[--surface] p-5 text-center space-y-2">
+              <p className="text-xs text-[--text-muted] uppercase tracking-wide">Uw referentienummer</p>
+              <p className="text-2xl font-mono font-bold text-[--text]">
+                {formatReference(result.applicationId)}
+              </p>
+              <p className="text-xs text-[--text-muted]">
+                Bewaar dit nummer. U kunt hiermee uw aanvraag later terugvinden.
+              </p>
+            </div>
 
             {/* What happens next */}
             <Card>
@@ -276,7 +308,7 @@ export function IntakePage() {
             </div>
 
             {/* Citizen message */}
-            {result?.citizenMessage && (
+            {result.citizenMessage && (
               <Card>
                 <CardHeader>
                   <CardTitle>Bericht van de gemeente</CardTitle>
