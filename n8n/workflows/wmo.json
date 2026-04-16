@@ -1,0 +1,701 @@
+{
+  "name": "WMO Intake",
+  "nodes": [
+    {
+      "id": "note-ontvangst",
+      "name": "Sectie: Ontvangst & validatie",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-20, 260],
+      "parameters": {
+        "content": "## 1. Ontvangst & validatie\nOntvangt aanvraag via webhook en valideert verplichte velden + AVG-toestemming.",
+        "height": 340,
+        "width": 680,
+        "color": 5
+      }
+    },
+    {
+      "id": "note-privacy",
+      "name": "Sectie: Privacy (AVG)",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [730, 200],
+      "parameters": {
+        "content": "## 2. Privacy (AVG)\nVervangt citizenId door token en verwijdert PII (naam, adres, geboortedatum) vóór elke AI-call.",
+        "height": 300,
+        "width": 640,
+        "color": 4
+      }
+    },
+    {
+      "id": "note-beleid",
+      "name": "Sectie: Beleid",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [730, 460],
+      "parameters": {
+        "content": "## 3. Beleid\nHaalt geldende WMO-regels op voor het gevraagde voorzieningstype.",
+        "height": 200,
+        "width": 640,
+        "color": 3
+      }
+    },
+    {
+      "id": "note-ai",
+      "name": "Sectie: AI-advies",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [1480, 260],
+      "parameters": {
+        "content": "## 4. AI-advies (EU AI Act, hoog risico)\nStub-LLM genereert advies, onderbouwing, vertrouwensscore. Volledig gelogd: model, input-hash, output.",
+        "height": 300,
+        "width": 680,
+        "color": 6
+      }
+    },
+    {
+      "id": "note-fairness",
+      "name": "Sectie: Fairness & routing",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [2230, 260],
+      "parameters": {
+        "content": "## 5. Fairness & routing\nDetecteert verboden termen en bepaalt of mens-in-de-loop nodig is (severity hoog, lage confidence, fairness-vlag, of meervoudige problematiek).",
+        "height": 300,
+        "width": 780,
+        "color": 2
+      }
+    },
+    {
+      "id": "note-audit",
+      "name": "Sectie: Audit & burgerbericht",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [3080, 140],
+      "parameters": {
+        "content": "## 6. Audit & burgerbericht\nPersistert in audit-DB (90 dagen bewaartermijn) en stuurt transparant Nederlands B1-bericht terug.",
+        "height": 540,
+        "width": 1260,
+        "color": 1
+      }
+    },
+    {
+      "id": "node-webhook",
+      "name": "Ontvang aanvraag",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [0, 400],
+      "webhookId": "wmo-intake-webhook",
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "wmo-intake",
+        "responseMode": "responseNode",
+        "options": {}
+      }
+    },
+    {
+      "id": "node-valideer",
+      "name": "Valideer aanvraag",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [250, 400],
+      "parameters": {
+        "method": "POST",
+        "url": "http://backend:8000/applications/validate",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.body) }}",
+        "options": {},
+        "continueOnFail": true
+      }
+    },
+    {
+      "id": "node-is-valide",
+      "name": "Aanvraag geldig?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.1,
+      "position": [500, 400],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": ""
+          },
+          "conditions": [
+            {
+              "id": "cond-valid",
+              "leftValue": "={{ $json.valid }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "node-fout-validatie",
+      "name": "Stuur foutmelding (400)",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [750, 600],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ \"error\": \"Validatie mislukt\", \"errors\": $json.errors || [], \"message\": \"Uw aanvraag kan niet worden verwerkt. Controleer of u toestemming heeft gegeven (consentForAI=true) en alle verplichte velden heeft ingevuld.\" }) }}",
+        "options": {
+          "responseCode": 400
+        }
+      }
+    },
+    {
+      "id": "node-pseudonimiseer",
+      "name": "Maak burger-token",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [750, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "http://backend:8000/pseudonymize",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ \"citizenId\": $('Ontvang aanvraag').item.json.body.citizenId }) }}",
+        "options": {},
+        "continueOnFail": true
+      }
+    },
+    {
+      "id": "node-minimaliseer",
+      "name": "Verwijder PII",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1000, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "http://backend:8000/minimize",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($('Ontvang aanvraag').item.json.body) }}",
+        "options": {},
+        "continueOnFail": true
+      }
+    },
+    {
+      "id": "node-haal-beleid-op",
+      "name": "Haal WMO-beleid op",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [750, 500],
+      "parameters": {
+        "method": "GET",
+        "url": "=http://backend:8000/policy/{{ $('Ontvang aanvraag').item.json.body.provisionType }}",
+        "options": {},
+        "continueOnFail": true
+      }
+    },
+    {
+      "id": "node-merge-privacy-beleid",
+      "name": "Combineer privacy + beleid",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.1,
+      "position": [1250, 400],
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineAll",
+        "options": {}
+      }
+    },
+    {
+      "id": "node-bouw-ai-context",
+      "name": "Bouw AI-context",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.2,
+      "position": [1500, 400],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": false,
+        "fields": {
+          "values": [
+            {
+              "name": "citizenToken",
+              "type": "stringValue",
+              "stringValue": "={{ $('Maak burger-token').item.json.token }}"
+            },
+            {
+              "name": "provisionType",
+              "type": "stringValue",
+              "stringValue": "={{ $('Verwijder PII').item.json.provisionType }}"
+            },
+            {
+              "name": "ageGroup",
+              "type": "stringValue",
+              "stringValue": "={{ $('Verwijder PII').item.json.ageGroup }}"
+            },
+            {
+              "name": "severity",
+              "type": "stringValue",
+              "stringValue": "={{ $('Verwijder PII').item.json.severity }}"
+            },
+            {
+              "name": "multipleProblems",
+              "type": "booleanValue",
+              "booleanValue": "={{ $('Verwijder PII').item.json.multipleProblems }}"
+            },
+            {
+              "name": "problemSummary",
+              "type": "stringValue",
+              "stringValue": "={{ $('Verwijder PII').item.json.problemSummary }}"
+            },
+            {
+              "name": "policy",
+              "type": "objectValue",
+              "objectValue": "={{ $('Haal WMO-beleid op').item.json }}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "node-ai-advies",
+      "name": "Vraag AI-advies",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1750, 400],
+      "parameters": {
+        "method": "POST",
+        "url": "http://backend:8000/ai/recommend",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "options": {},
+        "continueOnFail": true
+      }
+    },
+    {
+      "id": "node-fairness-check",
+      "name": "Controleer fairness",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2000, 400],
+      "parameters": {
+        "method": "POST",
+        "url": "http://backend:8000/fairness/check",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($('Vraag AI-advies').item.json) }}",
+        "options": {},
+        "continueOnFail": true
+      }
+    },
+    {
+      "id": "node-bepaal-route",
+      "name": "Bepaal route",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2250, 400],
+      "parameters": {
+        "method": "POST",
+        "url": "http://backend:8000/route/decide",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ \"severity\": $('Verwijder PII').item.json.severity, \"multipleProblems\": $('Verwijder PII').item.json.multipleProblems, \"risk_level\": $('Vraag AI-advies').item.json.risk_level, \"fairness_flags\": $('Controleer fairness').item.json.flags, \"confidence\": $('Vraag AI-advies').item.json.confidence, \"consentForAI\": $('Ontvang aanvraag').item.json.body.consentForAI }) }}",
+        "options": {},
+        "continueOnFail": true
+      }
+    },
+    {
+      "id": "node-routeer-beslissing",
+      "name": "Routeer beslissing",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 1,
+      "position": [2500, 400],
+      "parameters": {
+        "mode": "rules",
+        "dataType": "string",
+        "value1": "={{ $json.route }}",
+        "rules": {
+          "rules": [
+            {
+              "operation": "equal",
+              "value2": "auto",
+              "output": 0
+            },
+            {
+              "operation": "equal",
+              "value2": "review",
+              "output": 1
+            }
+          ]
+        },
+        "fallbackOutput": 2
+      }
+    },
+    {
+      "id": "node-bouw-bericht-auto",
+      "name": "Bouw burgerbericht (auto)",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.2,
+      "position": [2750, 260],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": false,
+        "fields": {
+          "values": [
+            {
+              "name": "citizenMessage",
+              "type": "stringValue",
+              "stringValue": "Uw WMO-aanvraag is ontvangen en automatisch beoordeeld. Bij de beoordeling is AI-ondersteuning gebruikt om uw aanvraag voor te bereiden. U ontvangt binnen de wettelijke termijn een officieel besluit."
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "node-bouw-bericht-review",
+      "name": "Bouw burgerbericht (review)",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.2,
+      "position": [2750, 400],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": false,
+        "fields": {
+          "values": [
+            {
+              "name": "citizenMessage",
+              "type": "stringValue",
+              "stringValue": "Uw WMO-aanvraag is ontvangen. Bij de beoordeling is AI-ondersteuning gebruikt om uw aanvraag voor te bereiden. Een medewerker van de gemeente kijkt mee en neemt uw aanvraag zorgvuldig door. U ontvangt zo spoedig mogelijk bericht."
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "node-bouw-bericht-rejected",
+      "name": "Bouw burgerbericht (afgewezen)",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.2,
+      "position": [2750, 540],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": false,
+        "fields": {
+          "values": [
+            {
+              "name": "citizenMessage",
+              "type": "stringValue",
+              "stringValue": "Uw WMO-aanvraag kan helaas niet worden verwerkt. Neem contact op met de gemeente voor een persoonlijke beoordeling."
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "node-schrijf-audit",
+      "name": "Schrijf audit-log",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [3000, 400],
+      "parameters": {
+        "method": "POST",
+        "url": "http://backend:8000/audit/write",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ \"citizenToken\": $('Maak burger-token').item.json.token, \"provisionType\": $('Verwijder PII').item.json.provisionType, \"severity\": $('Verwijder PII').item.json.severity, \"route\": $('Bepaal route').item.json.route, \"riskLevel\": $('Vraag AI-advies').item.json.risk_level, \"confidence\": $('Vraag AI-advies').item.json.confidence, \"fairnessFlags\": $('Controleer fairness').item.json.flags, \"finalDecisionStatus\": $('Bepaal route').item.json.route === 'review' ? 'pending_review' : 'auto_approved', \"processingPurpose\": \"wmo_intake\", \"problemSummary\": $('Verwijder PII').item.json.problemSummary, \"aiRecommendation\": $('Vraag AI-advies').item.json.recommendation, \"aiReasoning\": $('Vraag AI-advies').item.json.reasoning, \"aiModel\": $('Vraag AI-advies').item.json.model }) }}",
+        "options": {},
+        "continueOnFail": true
+      }
+    },
+    {
+      "id": "node-check-audit-fout",
+      "name": "Audit gelukt?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.1,
+      "position": [3250, 400],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": ""
+          },
+          "conditions": [
+            {
+              "id": "cond-audit-ok",
+              "leftValue": "={{ $json.applicationId }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "node-fout-backend",
+      "name": "Stuur foutmelding (500)",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [3500, 580],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ \"error\": \"Verwerking mislukt\", \"details\": \"Er is een technische fout opgetreden bij het verwerken van uw aanvraag. Probeer het later opnieuw of neem contact op met de gemeente.\" }) }}",
+        "options": {
+          "responseCode": 500
+        }
+      }
+    },
+    {
+      "id": "node-stuur-respons",
+      "name": "Stuur burgerbericht",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [3500, 400],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ \"applicationId\": $('Schrijf audit-log').item.json.applicationId, \"citizenToken\": $('Maak burger-token').item.json.token, \"route\": $('Bepaal route').item.json.route, \"riskLevel\": $('Vraag AI-advies').item.json.risk_level, \"aiRecommendation\": { \"recommendation\": $('Vraag AI-advies').item.json.recommendation, \"reasoning\": $('Vraag AI-advies').item.json.reasoning, \"confidence\": $('Vraag AI-advies').item.json.confidence, \"risk_level\": $('Vraag AI-advies').item.json.risk_level, \"model\": $('Vraag AI-advies').item.json.model }, \"fairnessFlags\": $('Controleer fairness').item.json.flags, \"citizenMessage\": $('Bepaal route').item.json.route === 'auto' ? 'Uw WMO-aanvraag is ontvangen en automatisch beoordeeld. Bij de beoordeling is AI-ondersteuning gebruikt om uw aanvraag voor te bereiden. U ontvangt binnen de wettelijke termijn een officieel besluit.' : $('Bepaal route').item.json.route === 'review' ? 'Uw WMO-aanvraag is ontvangen. Bij de beoordeling is AI-ondersteuning gebruikt om uw aanvraag voor te bereiden. Een medewerker van de gemeente kijkt mee en neemt uw aanvraag zorgvuldig door. U ontvangt zo spoedig mogelijk bericht.' : 'Uw WMO-aanvraag kan helaas niet worden verwerkt. Neem contact op met de gemeente voor een persoonlijke beoordeling.' }) }}",
+        "options": {
+          "responseCode": 200
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Ontvang aanvraag": {
+      "main": [
+        [
+          {
+            "node": "Valideer aanvraag",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Valideer aanvraag": {
+      "main": [
+        [
+          {
+            "node": "Aanvraag geldig?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aanvraag geldig?": {
+      "main": [
+        [
+          {
+            "node": "Maak burger-token",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Haal WMO-beleid op",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Stuur foutmelding (400)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Maak burger-token": {
+      "main": [
+        [
+          {
+            "node": "Verwijder PII",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verwijder PII": {
+      "main": [
+        [
+          {
+            "node": "Combineer privacy + beleid",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Haal WMO-beleid op": {
+      "main": [
+        [
+          {
+            "node": "Combineer privacy + beleid",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Combineer privacy + beleid": {
+      "main": [
+        [
+          {
+            "node": "Bouw AI-context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Bouw AI-context": {
+      "main": [
+        [
+          {
+            "node": "Vraag AI-advies",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Vraag AI-advies": {
+      "main": [
+        [
+          {
+            "node": "Controleer fairness",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Controleer fairness": {
+      "main": [
+        [
+          {
+            "node": "Bepaal route",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Bepaal route": {
+      "main": [
+        [
+          {
+            "node": "Routeer beslissing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Routeer beslissing": {
+      "main": [
+        [
+          {
+            "node": "Bouw burgerbericht (auto)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Bouw burgerbericht (review)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Bouw burgerbericht (afgewezen)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Bouw burgerbericht (auto)": {
+      "main": [
+        [
+          {
+            "node": "Schrijf audit-log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Bouw burgerbericht (review)": {
+      "main": [
+        [
+          {
+            "node": "Schrijf audit-log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Bouw burgerbericht (afgewezen)": {
+      "main": [
+        [
+          {
+            "node": "Schrijf audit-log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schrijf audit-log": {
+      "main": [
+        [
+          {
+            "node": "Audit gelukt?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Audit gelukt?": {
+      "main": [
+        [
+          {
+            "node": "Stuur burgerbericht",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Stuur foutmelding (500)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Europe/Amsterdam"
+  },
+  "versionId": "1",
+  "meta": {
+    "instanceId": "wmo-prototype"
+  },
+  "id": "wmo-intake"
+}

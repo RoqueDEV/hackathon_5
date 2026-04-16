@@ -1,0 +1,155 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: wmo-postgres
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_DB: wmo
+      POSTGRES_USER: wmo
+      POSTGRES_PASSWORD: wmo_local_dev
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U wmo -d wmo"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: ./backend
+    container_name: wmo-backend
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+psycopg://wmo:wmo_local_dev@postgres:5432/wmo
+      PSEUDONYM_SECRET: ${PSEUDONYM_SECRET:-local_dev_secret_change_me}
+      CONFIDENCE_THRESHOLD: ${CONFIDENCE_THRESHOLD:-0.7}
+      RETENTION_DAYS: ${RETENTION_DAYS:-90}
+      LOG_LEVEL: INFO
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c 'import urllib.request,sys;sys.exit(0 if urllib.request.urlopen(\"http://localhost:8000/health\").status==200 else 1)'"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  n8n-import:
+    image: n8nio/n8n:latest
+    container_name: wmo-n8n-import
+    user: root
+    entrypoint: /bin/sh
+    command:
+      - -c
+      - |
+        set -e
+        mkdir -p /home/node/.n8n
+        find /home/node/.n8n -maxdepth 1 ! -path /home/node/.n8n ! -name workflows -exec chown -R node:node {} +
+        su node -c "n8n import:workflow --separate --input=/home/node/.n8n/workflows || true"
+        su node -c "n8n update:workflow --id=wmo-intake --active=true || n8n publish:workflow --id=wmo-intake || true"
+    environment:
+      N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY:-local_dev_encryption_key_32_chars}
+      DB_TYPE: postgresdb
+      DB_POSTGRESDB_HOST: postgres
+      DB_POSTGRESDB_PORT: "5432"
+      DB_POSTGRESDB_DATABASE: wmo
+      DB_POSTGRESDB_USER: wmo
+      DB_POSTGRESDB_PASSWORD: wmo_local_dev
+      N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS: "false"
+    volumes:
+      - n8n_data:/home/node/.n8n
+      - ./n8n/workflows:/home/node/.n8n/workflows:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: wmo-n8n
+    ports:
+      - "5678:5678"
+    environment:
+      N8N_BASIC_AUTH_ACTIVE: "true"
+      N8N_BASIC_AUTH_USER: ${N8N_BASIC_AUTH_USER:-admin}
+      N8N_BASIC_AUTH_PASSWORD: ${N8N_BASIC_AUTH_PASSWORD:-admin_local_dev}
+      N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY:-local_dev_encryption_key_32_chars}
+      N8N_HOST: localhost
+      N8N_PORT: "5678"
+      WEBHOOK_URL: http://localhost:5678/
+      GENERIC_TIMEZONE: Europe/Amsterdam
+      DB_TYPE: postgresdb
+      DB_POSTGRESDB_HOST: postgres
+      DB_POSTGRESDB_PORT: "5432"
+      DB_POSTGRESDB_DATABASE: wmo
+      DB_POSTGRESDB_USER: wmo
+      DB_POSTGRESDB_PASSWORD: wmo_local_dev
+      N8N_RUNNERS_ENABLED: "true"
+      N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS: "false"
+    volumes:
+      - n8n_data:/home/node/.n8n
+      - ./n8n/workflows:/home/node/.n8n/workflows:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      n8n-import:
+        condition: service_completed_successfully
+
+  frontend:
+    build:
+      context: ./frontend
+    container_name: wmo-frontend
+    ports:
+      - "5173:5173"
+    environment:
+      VITE_API_BASE_URL: http://localhost:8000
+      VITE_N8N_WEBHOOK_URL: http://localhost:5678/webhook/wmo-intake
+    depends_on:
+      - backend
+
+  redis:
+    image: redis:7-alpine
+    container_name: wmo-redis
+    ports:
+      - "6379:6379"
+    profiles:
+      - scale
+
+  n8n-worker:
+    image: n8nio/n8n:latest
+    container_name: wmo-n8n-worker
+    command: worker
+    environment:
+      N8N_BASIC_AUTH_ACTIVE: "true"
+      N8N_BASIC_AUTH_USER: ${N8N_BASIC_AUTH_USER:-admin}
+      N8N_BASIC_AUTH_PASSWORD: ${N8N_BASIC_AUTH_PASSWORD:-admin_local_dev}
+      N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY:-local_dev_encryption_key_32_chars}
+      N8N_HOST: localhost
+      N8N_PORT: "5678"
+      WEBHOOK_URL: http://localhost:5678/
+      GENERIC_TIMEZONE: Europe/Amsterdam
+      DB_TYPE: postgresdb
+      DB_POSTGRESDB_HOST: postgres
+      DB_POSTGRESDB_PORT: "5432"
+      DB_POSTGRESDB_DATABASE: wmo
+      DB_POSTGRESDB_USER: wmo
+      DB_POSTGRESDB_PASSWORD: wmo_local_dev
+      EXECUTIONS_MODE: queue
+      QUEUE_BULL_REDIS_HOST: redis
+    depends_on:
+      - postgres
+      - redis
+      - n8n
+    profiles:
+      - scale
+
+volumes:
+  postgres_data:
+  n8n_data:

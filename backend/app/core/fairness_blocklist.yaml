@@ -1,0 +1,51 @@
+# Verboden termen per categorie.
+# Voeg termen toe om de blocklist uit te breiden.
+religie:
+  - religie
+  - godsdienst
+  - christelijk
+  - islamitisch
+  - moslim
+  - joods
+  - hindoe
+  - boeddhistisch
+  - atheïst
+  - gelovig
+  - kerk
+  - moskee
+  - synagoge
+ras:
+  - ras
+  - huidskleur
+  - blank
+  - zwart
+  - donker
+  - licht
+etniciteit:
+  - etniciteit
+  - etnisch
+  - afkomst
+  - herkomst
+nationaliteit:
+  - nationaliteit
+  - buitenlander
+  - allochtoon
+  - autochtoon
+  - migrant
+  - vluchteling
+  - asielzoeker
+geslacht:
+  - geslacht
+  - man
+  - vrouw
+  - mannelijk
+  - vrouwelijk
+  - transgender
+  - non-binair
+seksuele_geaardheid:
+  - seksuele_geaardheid
+  - seksuele geaardheid
+  - homo
+  - lesbisch
+  - biseksueel
+  - lgbtq
